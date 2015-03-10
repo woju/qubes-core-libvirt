@@ -51,7 +51,7 @@ index 0000000..b44876a
 +(args ' method=http://download.fedora.devel.redhat.com/pub/fedora/linux/\
 +core/test/5.91/x86_64/os  ')))(device (vbd (dev 'xvda')\
 +(uname 'file:/root/some.img')(mode 'w')))\
-+(device (vif (mac '00:11:22:33:44:55')(bridge 'xenbr2')(script 'vif-bridge')(backend 'netvm'))))
++(device (vif (mac '00:11:22:33:44:55')(bridge 'xenbr2')(script 'vif-bridge')(backend 'sys-net'))))
 diff --git a/tests/sexpr2xmldata/sexpr2xml-bridge-driver-domain.xml b/tests/sexpr2xmldata/sexpr2xml-bridge-driver-domain.xml
 new file mode 100644
 index 0000000..9a1626f
@@ -83,7 +83,7 @@ index 0000000..9a1626f
 +    </disk>
 +    <interface type='bridge'>
 +      <mac address='00:11:22:33:44:55'/>
-+      <source bridge='xenbr2' domain='netvm'/>
++      <source bridge='xenbr2' domain='sys-net'/>
 +      <script path='vif-bridge'/>
 +      <target dev='vif6.0'/>
 +    </interface>

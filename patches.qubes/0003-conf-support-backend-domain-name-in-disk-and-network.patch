@@ -70,7 +70,7 @@ index c5ad6f4..38c42d5 100644
 +  &lt;devices&gt;
 +    ...
 +    &lt;interface type='bridge'&gt;
-+      &lt;source bridge='br0' <b>domain='netvm'</b>/&gt;
++      &lt;source bridge='br0' <b>domain='sys-net'</b>/&gt;
 +    &lt;/interface&gt;
 +    ...
 +  &lt;/devices&gt;

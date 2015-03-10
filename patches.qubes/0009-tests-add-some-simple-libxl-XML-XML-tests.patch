@@ -254,7 +254,7 @@ index 0000000..31c0437
 +    </disk>
 +    <interface type='bridge'>
 +      <mac address='00:16:3e:5e:6c:09'/>
-+      <source bridge='xenbr0' domain='netvm'/>
++      <source bridge='xenbr0' domain='sys-net'/>
 +    </interface>
 +    <console type='pty'>
 +      <target type='xen' port='0'/>
