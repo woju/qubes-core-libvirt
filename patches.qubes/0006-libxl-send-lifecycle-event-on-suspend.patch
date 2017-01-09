@@ -1,4 +1,4 @@
-From e327775eeed5d3a9fa3231f171951bf17d9eaa85 Mon Sep 17 00:00:00 2001
+From 9a1882e86f39dc654357fdb4fc9a8c3a3d7cd981 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Marek=20Marczykowski-G=C3=B3recki?=
  <marmarek@invisiblethingslab.com>
 Date: Tue, 10 Feb 2015 03:56:08 +0100
@@ -11,14 +11,14 @@ Cc: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 
 Signed-off-by: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 ---
- src/libxl/libxl_domain.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ src/libxl/libxl_domain.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
 diff --git a/src/libxl/libxl_domain.c b/src/libxl/libxl_domain.c
-index 9feba08..2caab76 100644
+index 5cde576..26124de 100644
 --- a/src/libxl/libxl_domain.c
 +++ b/src/libxl/libxl_domain.c
-@@ -498,6 +498,18 @@ libxlDomainShutdownThread(void *opaque)
+@@ -506,6 +506,18 @@ libxlDomainShutdownThread(void *opaque)
          case VIR_DOMAIN_LIFECYCLE_LAST:
              goto endjob;
          }
@@ -37,15 +37,16 @@ index 9feba08..2caab76 100644
      } else {
          VIR_INFO("Unhandled shutdown_reason %d", xl_reason);
          goto endjob;
-@@ -547,7 +559,6 @@ libxlDomainEventHandler(void *data, VIR_LIBXL_EVENT_CONST libxl_event *event)
+@@ -554,7 +566,7 @@ void
+ libxlDomainEventHandler(void *data, VIR_LIBXL_EVENT_CONST libxl_event *event)
  {
      libxlDriverPrivatePtr driver = data;
-     virDomainObjPtr vm = NULL;
 -    libxl_shutdown_reason xl_reason = event->u.domain_shutdown.shutdown_reason;
++    virDomainObjPtr vm = NULL;
      struct libxlShutdownThreadInfo *shutdown_info = NULL;
      virThread thread;
      libxlDriverConfigPtr cfg;
-@@ -557,13 +568,6 @@ libxlDomainEventHandler(void *data, VIR_LIBXL_EVENT_CONST libxl_event *event)
+@@ -564,12 +576,11 @@ libxlDomainEventHandler(void *data, VIR_LIBXL_EVENT_CONST libxl_event *event)
          goto error;
      }
  
@@ -54,11 +55,14 @@ index 9feba08..2caab76 100644
 -     * after calling libxl_domain_suspend() are handled by its callers.
 -     */
 -    if (xl_reason == LIBXL_SHUTDOWN_REASON_SUSPEND)
--        goto error;
--
-     vm = virDomainObjListFindByIDRef(driver->domains, event->domid);
-     if (!vm) {
-         VIR_INFO("Received event for unknown domain ID %d", event->domid);
++    vm = virDomainObjListFindByIDRef(driver->domains, event->domid);
++    if (!vm) {
++        VIR_INFO("Received event for unknown domain ID %d", event->domid);
+         goto error;
++    }
+ 
+     /*
+      * Start a thread to handle shutdown.  We don't want to be tying up
 -- 
-2.5.5
+2.7.4
 
