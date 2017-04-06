@@ -1,0 +1,57 @@
+From df6b74ae0cfd0b8528eed74b2662a91bb9760a56 Mon Sep 17 00:00:00 2001
+From: "Daniel P. Berrange" <berrange@redhat.com>
+Date: Tue, 4 Apr 2017 15:31:31 +0100
+Subject: [PATCH] event-test: add timeout to exit event loop
+Cc: Wojtek Porczyk <woju@invisiblethingslab.com>
+
+Signed-off-by: Daniel P. Berrange <berrange@redhat.com>
+---
+ examples/event-test.py | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/examples/event-test.py b/examples/event-test.py
+index 782fb9e..9b86091 100755
+--- a/examples/event-test.py
++++ b/examples/event-test.py
+@@ -648,15 +648,17 @@ def usage():
+     print("   --help, -h   Print(this help message")
+     print("   --debug, -d  Print(debug output")
+     print("   --loop, -l   Toggle event-loop-implementation")
++    print("   --timeout=SECS  Quit after SECS seconds running")
+ 
+ def main():
+     try:
+-        opts, args = getopt.getopt(sys.argv[1:], "hdl", ["help", "debug", "loop"])
++        opts, args = getopt.getopt(sys.argv[1:], "hdl", ["help", "debug", "loop", "timeout="])
+     except getopt.GetoptError as err:
+         # print help information and exit:
+         print(str(err)) # will print something like "option -a not recognized"
+         usage()
+         sys.exit(2)
++    timeout = None
+     for o, a in opts:
+         if o in ("-h", "--help"):
+             usage()
+@@ -667,6 +669,8 @@ def main():
+         if o in ("-l", "--loop"):
+             global use_pure_python_event_loop
+             use_pure_python_event_loop ^= True
++        if o in ("--timeout"):
++            timeout = int(a)
+ 
+     if len(args) >= 1:
+         uri = args[0]
+@@ -737,7 +741,9 @@ def main():
+     # of demo we'll just go to sleep. The other option is to
+     # run the event loop in your main thread if your app is
+     # totally event based.
+-    while run:
++    count = 0
++    while run and (timeout is None or count < timeout):
++        count = count + 1
+         time.sleep(1)
+ 
+ 
+-- 
+2.5.5
+

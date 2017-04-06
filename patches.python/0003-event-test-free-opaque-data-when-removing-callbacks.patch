@@ -1,0 +1,65 @@
+From 4ff1828985291736a608fcaa9d3a502969b5a59c Mon Sep 17 00:00:00 2001
+From: "Daniel P. Berrange" <berrange@redhat.com>
+Date: Tue, 4 Apr 2017 15:31:30 +0100
+Subject: [PATCH] event-test: free opaque data when removing callbacks
+Cc: Wojtek Porczyk <woju@invisiblethingslab.com>
+
+The pure python event loop impl has to call
+
+  libvirt.virEventInvokeFreeCallback
+
+to free the event opaque data from a clean stack context
+
+Signed-off-by: Daniel P. Berrange <berrange@redhat.com>
+---
+ examples/event-test.py | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/examples/event-test.py b/examples/event-test.py
+index d5af33c..782fb9e 100755
+--- a/examples/event-test.py
++++ b/examples/event-test.py
+@@ -107,6 +107,7 @@ class virEventLoopPure:
+         self.nextTimerID = 1
+         self.handles = []
+         self.timers = []
++        self.cleanup = []
+         self.quit = False
+ 
+         # The event loop can be used from multiple threads at once.
+@@ -178,6 +179,11 @@ class virEventLoopPure:
+     def run_once(self):
+         sleep = -1
+         self.runningPoll = True
++
++        for opaque in self.cleanup:
++            libvirt.virEventInvokeFreeCallback(opaque)
++        self.cleanup = []
++
+         try:
+             next = self.next_timeout()
+             debug("Next timeout due at %d" % next)
+@@ -300,8 +306,9 @@ class virEventLoopPure:
+         handles = []
+         for h in self.handles:
+             if h.get_id() == handleID:
+-                self.poll.unregister(h.get_fd())
+                 debug("Remove handle %d fd %d" % (handleID, h.get_fd()))
++                self.poll.unregister(h.get_fd())
++                self.cleanup.append(h.opaque)
+             else:
+                 handles.append(h)
+         self.handles = handles
+@@ -313,7 +320,9 @@ class virEventLoopPure:
+         for h in self.timers:
+             if h.get_id() != timerID:
+                 timers.append(h)
++            else:
+                 debug("Remove timer %d" % timerID)
++                self.cleanup.append(h.opaque)
+         self.timers = timers
+         self.interrupt()
+ 
+-- 
+2.5.5
+

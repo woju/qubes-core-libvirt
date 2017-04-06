@@ -1,7 +1,9 @@
-From 708ad25f6877669edd835f536e5de3849acd14e3 Mon Sep 17 00:00:00 2001
+From c56af99f0319fd03b46bf57c120fff59650d46fd Mon Sep 17 00:00:00 2001
 From: Wojtek Porczyk <woju@invisiblethingslab.com>
-Date: Thu, 16 Mar 2017 20:22:26 +0100
+Date: Tue, 4 Apr 2017 15:31:29 +0100
 Subject: [PATCH] Add asyncio event loop implementation
+Organization: Invisible Things Lab
+Cc: Wojtek Porczyk <woju@invisiblethingslab.com>
 
 This is usable only on python >= 3.4 (or 3.3 with out-of-tree asyncio),
 however it should be harmless for anyone with older python versions.
@@ -15,18 +17,19 @@ The function is not present on non-compatible platforms.
 
 Signed-off-by: Wojtek Porczyk <woju@invisiblethingslab.com>
 ---
- libvirtaio.py          | 401 +++++++++++++++++++++++++++++++++++++++++++++++++
- sanitytest.py          |   2 +-
+ MANIFEST.in            |   1 +
+ libvirt-python.spec.in |   2 +
+ libvirtaio.py          | 399 +++++++++++++++++++++++++++++++++++++++++++++++++
  setup.py               |  12 ++
- 4 files changed, 415 insertions(+), 1 deletion(-)
+ 4 files changed, 414 insertions(+)
  create mode 100644 libvirtaio.py
 
 diff --git a/libvirtaio.py b/libvirtaio.py
 new file mode 100644
-index 0000000..8428f71
+index 0000000..7c8c396
 --- /dev/null
 +++ b/libvirtaio.py
-@@ -0,0 +1,401 @@
+@@ -0,0 +1,399 @@
 +#
 +# libvirtaio -- asyncio adapter for libvirt
 +# Copyright (C) 2017  Wojtek Porczyk <woju@invisiblethingslab.com>
@@ -98,7 +101,7 @@ index 0000000..8428f71
 +        self.impl.callbacks[self.iden] = self
 +
 +    def __repr__(self):
-+        return '<{} iden={}>'.format(self.__clas__.__name__, self.iden)
++        return '<{} iden={}>'.format(self.__class__.__name__, self.iden)
 +
 +    def close(self):
 +        '''Schedule *ff* callback'''
@@ -224,7 +227,7 @@ index 0000000..8428f71
 +        return '<{} iden={} fd={} event={}>'.format(
 +            self.__class__.__name__, self.iden, self.descriptor.fd, self.event)
 +
-+    def update(self, *, event):
++    def update(self, event):
 +        '''Update the callback and fix descriptor's watchers'''
 +        self.event = event
 +        self.descriptor.update()
@@ -235,9 +238,9 @@ index 0000000..8428f71
 +
 +class TimeoutCallback(Callback):
 +    '''Callback for timer'''
-+    def __init__(self, *args, timeout, **kwargs):
++    def __init__(self, *args, **kwargs):
 +        super().__init__(*args, **kwargs)
-+        self.timeout = timeout
++        self.timeout = -1
 +        self._task = None
 +
 +    def __repr__(self):
@@ -251,9 +254,6 @@ index 0000000..8428f71
 +        This is a coroutine.
 +        '''
 +        while True:
-+            assert self.timeout >= 0, \
-+                'invalid timeout {} for running timer'.format(self.timeout)
-+
 +            try:
 +                if self.timeout > 0:
 +                    timeout = self.timeout * 1e-3
@@ -270,10 +270,9 @@ index 0000000..8428f71
 +            self.cb(self.iden, self.opaque)
 +            self.impl.log.debug('timer %r callback ended', self.iden)
 +
-+    def update(self, *, timeout=None):
++    def update(self, timeout):
 +        '''Start or the timer, possibly updating timeout'''
-+        if timeout is not None:
-+            self.timeout = timeout
++        self.timeout = timeout
 +
 +        if self.timeout >= 0 and self._task is None:
 +            self.impl.log.debug('timer %r start', self.iden)
@@ -287,9 +286,8 @@ index 0000000..8428f71
 +
 +    def close(self):
 +        '''Stop the timer and call ff callback'''
-+        self.timeout = -1
-+        self.update()
-+        super().close()
++        super(TimeoutCallback, self).close()
++        self.update(timeout=-1)
 +
 +#
 +# main implementation
@@ -303,7 +301,7 @@ index 0000000..8428f71
 +    If *loop* is not specified, the current (or default) event loop is used.
 +    '''
 +
-+    def __init__(self, *, loop=None):
++    def __init__(self, loop=None):
 +        self.loop = loop or asyncio.get_event_loop()
 +        self.callbacks = {}
 +        self.descriptors = DescriptorDict(self)
@@ -320,7 +318,7 @@ index 0000000..8428f71
 +
 +    def schedule_ff_callback(self, opaque):
 +        '''Schedule a ff callback from one of the handles or timers'''
-+        self.loop.call_soon(libvirt.virEventExecuteFFCallback, opaque)
++        self.loop.call_soon(libvirt.virEventInvokeFreeCallback, opaque)
 +
 +    def is_idle(self):
 +        '''Returns False if there are leftovers from a connection
@@ -374,7 +372,10 @@ index 0000000..8428f71
 +        '''
 +        self.log.debug('remove_handle(watch=%d)', watch)
 +        callback = self.callbacks.pop(watch)
-+        assert callback is self.descriptors.remove_handle(watch)
++        fd = callback.descriptor.fd
++        assert callback is self.descriptors[fd].remove_handle(watch)
++        if len(self.descriptors[fd].callbacks) == 0:
++            del self.descriptors[fd]
 +        callback.close()
 +
 +    def _add_timeout(self, timeout, cb, opaque):
@@ -391,9 +392,9 @@ index 0000000..8428f71
 +        '''
 +        self.log.debug('add_timeout(timeout=%d, cb=%r, opaque=%r)',
 +                timeout, cb, opaque)
-+        callback = TimeoutCallback(self, cb, opaque, timeout=timeout)
++        callback = TimeoutCallback(self, cb, opaque)
 +        self.callbacks[callback.iden] = callback
-+        callback.update()
++        callback.update(timeout=timeout)
 +        return callback.iden
 +
 +    def _update_timeout(self, timer, timeout):
@@ -421,26 +422,13 @@ index 0000000..8428f71
 +        callback = self.callbacks.pop(timer)
 +        callback.close()
 +
-+def virEventRegisterAsyncIOImpl(*, loop=None):
++def virEventRegisterAsyncIOImpl(loop=None):
 +    '''Arrange for libvirt's callbacks to be dispatched via asyncio event loop
 +
 +    The implementation object is returned, but in normal usage it can safely be
 +    discarded.
 +    '''
 +    return virEventAsyncIOImpl(loop=loop).register()
-diff --git a/sanitytest.py b/sanitytest.py
-index 6548831..53a739f 100644
---- a/sanitytest.py
-+++ b/sanitytest.py
-@@ -350,7 +350,7 @@ for klass in gotfunctions:
-     for func in sorted(gotfunctions[klass]):
-         # These are pure python methods with no C APi
-         if func in ["connect", "getConnect", "domain", "getDomain",
--                "virEventRegisterAsyncIOImpl"]:
-+                "virEventRegisterAsyncIOImpl", "virEventExecuteFFCallback"]:
-             continue
- 
-         key = "%s.%s" % (klass, func)
 diff --git a/setup.py b/setup.py
 index 120ddd5..bac9010 100755
 --- a/setup.py
